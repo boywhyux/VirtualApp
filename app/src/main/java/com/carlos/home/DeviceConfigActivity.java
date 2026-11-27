@@ -118,7 +118,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
         setContentView(scroll);
 
         TextView hint = new TextView(this);
-        hint.setText("开关打开后，这个分身看到的 IMEI、Android ID、MAC 等都是下面填的值；保存后重启分身生效。每个分身各用各的配置。");
+        hint.setText("开关打开后，这个分身看到的 IMEI、Android ID、MAC 等都是下面填的值；点随机生成会自动打开开关；保存后重启分身生效。每个分身各用各的配置。");
         hint.setPadding(0, 0, 0, dp(12));
         root.addView(hint);
 
@@ -209,7 +209,8 @@ public class DeviceConfigActivity extends AppCompatActivity {
 
     private void onRandom() {
         VDeviceConfig random = VDeviceConfig.random();
-        random.enable = mEnableSwitch.isChecked();
+        random.enable = true;
+        mEnableSwitch.setChecked(true);
         for (int i = 0; i < PROP_KEYS.length; i++) {
             random.setProp(PROP_KEYS[i], mConfig.getProp(PROP_KEYS[i]));
         }
@@ -247,6 +248,12 @@ public class DeviceConfigActivity extends AppCompatActivity {
                 return;
             }
             VDeviceManager.get().updateDeviceConfig(mUserId, mConfig);
+            VDeviceConfig check = VDeviceManager.get().getDeviceConfig(mUserId);
+            if (check == null || check.enable != mConfig.enable
+                        || !TextUtils.equals(check.deviceId, mConfig.deviceId)) {
+                Toast.makeText(this, "保存失败，请重试", Toast.LENGTH_LONG).show();
+                return;
+            }
         } catch (Throwable e) {
             Toast.makeText(this, "保存失败", Toast.LENGTH_LONG).show();
             return;
