@@ -52,6 +52,20 @@ public class DeviceConfigActivity extends AppCompatActivity {
             "品牌", "型号", "产品名", "设备", "主板",
             "显示版本", "编译 ID", "制造商", "指纹"
     };
+    private static final String[][] DEVICE_PROFILES = {
+            {"samsung", "SM-S918B", "dm3q", "dm3q", "qcom",
+                    "TP1A.220624.014.S918BXXS3AWIF", "TP1A.220624.014", "samsung",
+                    "samsung/dm3qxxx/dm3q:13/TP1A.220624.014/S918BXXS3AWIF:user/release-keys"},
+            {"Xiaomi", "2211133C", "fuxi", "fuxi", "qcom",
+                    "TKQ1.220807.001", "TKQ1.220807.001", "Xiaomi",
+                    "Xiaomi/fuxi/fuxi:13/TKQ1.220807.001/V14.0.23.0.TMCCNXM:user/release-keys"},
+            {"google", "Pixel 7", "panther", "panther", "gs201",
+                    "TQ3A.230705.001", "TQ3A.230705.001", "Google",
+                    "google/panther/panther:13/TQ3A.230705.001/10204925:user/release-keys"},
+            {"OnePlus", "CPH2449", "OP5961L1", "OP5961L1", "qcom",
+                    "TP1A.220905.001", "TP1A.220905.001", "OnePlus",
+                    "OnePlus/OP5961L1/OP5961L1:13/TP1A.220905.001/R.1a26a8c_1:user/release-keys"},
+    };
 
     private int mUserId;
     private VDeviceConfig mConfig;
@@ -223,6 +237,10 @@ public class DeviceConfigActivity extends AppCompatActivity {
             mConfig.wifiMac = randomMac(rnd);
             mConfig.bluetoothMac = randomMac(rnd);
             mConfig.serial = randomSerial();
+            String[] profile = DEVICE_PROFILES[rnd.nextInt(DEVICE_PROFILES.length)];
+            for (int i = 0; i < PROP_KEYS.length; i++) {
+                mConfig.setProp(PROP_KEYS[i], profile[i]);
+            }
             mConfig.enable = true;
             mEnableSwitch.setChecked(true);
             refreshUi();
