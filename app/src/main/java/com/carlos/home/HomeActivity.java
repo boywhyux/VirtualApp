@@ -136,6 +136,28 @@ public class HomeActivity extends VActivity implements HomeContract.HomeView, La
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         overridePendingTransition(0, 0);
         super.onCreate(savedInstanceState);
+        // 崩溃日志：闪退时把堆栈写到应用专属目录，方便定位（调试用）
+        try {
+            final Thread.UncaughtExceptionHandler origHandler = Thread.getDefaultUncaughtExceptionHandler();
+            Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+                @Override
+                public void uncaughtException(Thread t, Throwable e) {
+                    try {
+                        java.io.File logFile = new java.io.File(getExternalFilesDir(null), "carlos-crash.log");
+                        java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter(logFile, true));
+                        pw.println("=== " + new java.util.Date() + " thread=" + t.getName() + " ===");
+                        e.printStackTrace(pw);
+                        pw.flush();
+                        pw.close();
+                    } catch (Throwable ignored) {
+                    }
+                    if (origHandler != null) {
+                        origHandler.uncaughtException(t, e);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+        }
         setContentView(R.layout.activity_home);
         mUiHandler = new Handler(Looper.getMainLooper());
 
