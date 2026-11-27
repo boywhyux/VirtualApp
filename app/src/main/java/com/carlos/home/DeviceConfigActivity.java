@@ -31,7 +31,9 @@ import java.util.Random;
 
 /**
  * 自己写的伪造设备页，替代原版打不开的 DeviceDetailActiivty。
- * 引擎按虚拟用户 userId 读配置，所以这里直接改 userId 对应的那份配置。
+ * 注意这里有两把钥匙：引擎（VClient）按原始 userId 读配置，但分身管理页
+ * “机型模拟”那行的状态是按包名 hashCode + userId 查的（BaseActivity.getDeviceId），
+ * 所以保存时两把钥匙都要写同一份配置，否则显示永远是 No mock。
  */
 public class DeviceConfigActivity extends AppCompatActivity {
 
@@ -68,6 +70,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
     };
 
     private int mUserId;
+    private String mPackageName;
     private VDeviceConfig mConfig;
     private Switch mEnableSwitch;
     private EditText mImeiEdit;
@@ -84,6 +87,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Intent intent = getIntent();
         mUserId = intent.getIntExtra("userId", -1);
+        mPackageName = intent.getStringExtra("packageName");
         String title = intent.getStringExtra("title");
         if (mUserId < 0) {
             Toast.makeText(this, "分身信息不对", Toast.LENGTH_SHORT).show();
@@ -106,6 +110,12 @@ public class DeviceConfigActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    // 管理页查状态用的钥匙：包名 hashCode + userId（见 BaseActivity.getDeviceId）。
+    // 包名拿不到时返回 mUserId，和引擎那把钥匙相同，等于只写一份。
+    private int displayKey() {
+        return mPackageName == null ? mUserId : mPackageName.hashCode() + mUserId;
     }
 
     private void loadConfig() {
@@ -135,7 +145,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
         setContentView(scroll);
 
         TextView hint = new TextView(this);
-        hint.setText("开关打开后，这个分身看到的 IMEI、Android ID、MAC 等都是下面填的值；点随机生成会自动打开开关；保存后页面会显示已存入的值，重启分身生效。每个分身各用各的配置。");
+        hint.setText("开关打开后，这个分身看到的 IMEI、Android ID、MAC 等都是下面填的值；点随机生成会自动打开开关；保存后页面会显示已存入的值，管理页的机型模拟也会跟着变，重启分身生效。每个分身各用各的配置。");
         hint.setPadding(0, 0, 0, dp(12));
         root.addView(hint);
 
@@ -335,9 +345,17 @@ public class DeviceConfigActivity extends AppCompatActivity {
                 return;
             }
             VDeviceManager.get().updateDeviceConfig(mUserId, mConfig);
+            // 分身管理页按包名 hashCode + userId 查状态，同一份配置再写一份，
+            // 否则那行永远显示 No mock。
+            VDeviceManager.get().updateDeviceConfig(displayKey(), mConfig);
             VDeviceConfig check = VDeviceManager.get().getDeviceConfig(mUserId);
             if (check == null || check.enable != mConfig.enable
                     || !TextUtils.equals(check.deviceId, mConfig.deviceId)) {
+                Toast.makeText(this, "保存失败，请重试", Toast.LENGTH_LONG).show();
+                return;
+            }
+            VDeviceConfig displayCheck = VDeviceManager.get().getDeviceConfig(displayKey());
+            if (displayCheck == null || displayCheck.enable != mConfig.enable) {
                 Toast.makeText(this, "保存失败，请重试", Toast.LENGTH_LONG).show();
                 return;
             }
@@ -361,7 +379,15 @@ public class DeviceConfigActivity extends AppCompatActivity {
             mStatusText.setText("读取存入的值失败，请重进页面再看一次。");
             return;
         }
+        boolean displayOn = false;
+        try {
+            VDeviceConfig display = VDeviceManager.get().getDeviceConfig(displayKey());
+            displayOn = display != null && display.enable;
+        } catch (Throwable e) {
+            displayOn = false;
+        }
         mStatusText.setText("已存入（分身 " + mUserId + "）：开关=" + (saved.enable ? "开" : "关")
+                + "\n管理页显示=" + (displayOn ? "模拟中" : "未模拟")
                 + "\nIMEI=" + def(saved.deviceId, "（空）")
                 + "\nAndroid ID=" + def(saved.androidId, "（空）")
                 + "\nWiFi MAC=" + def(saved.wifiMac, "（空）")
