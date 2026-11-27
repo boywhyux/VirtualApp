@@ -1,8 +1,5 @@
 package com.lody.virtual.client.ipc;
 
-import android.os.RemoteException;
-
-import com.lody.virtual.client.env.VirtualRuntime;
 import com.lody.virtual.helper.utils.IInterfaceUtils;
 import com.lody.virtual.helper.utils.Reflect;
 import com.lody.virtual.helper.utils.ReflectException;
@@ -31,6 +28,9 @@ public class VDeviceManager {
         if (!IInterfaceUtils.isAlive(mService)) {
             synchronized (this) {
                 Object binder = getRemoteInterface();
+                if (binder == null) {
+                    return null;
+                }
                 mService = LocalProxyUtils.genProxy(IDeviceManager.class, binder);
             }
         }
@@ -45,33 +45,43 @@ public class VDeviceManager {
 
     public VDeviceConfig getDeviceConfig(int userId) {
         try {
-            return getService().getDeviceConfig(userId);
-        } catch (RemoteException e) {
-            return VirtualRuntime.crash(e);
+            IDeviceManager service = getService();
+            if (service == null) {
+                return new VDeviceConfig();
+            }
+            VDeviceConfig config = service.getDeviceConfig(userId);
+            return config != null ? config : new VDeviceConfig();
+        } catch (Throwable e) {
+            return new VDeviceConfig();
         }
     }
 
     public void updateDeviceConfig(int userId, VDeviceConfig config) {
         try {
-            getService().updateDeviceConfig(userId, config);
-        } catch (RemoteException e) {
-            VirtualRuntime.crash(e);
+            IDeviceManager service = getService();
+            if (service != null) {
+                service.updateDeviceConfig(userId, config);
+            }
+        } catch (Throwable ignored) {
         }
     }
 
     public boolean isEnable(int userId) {
         try {
-            return getService().isEnable(userId);
-        } catch (RemoteException e) {
-            return VirtualRuntime.crash(e);
+            IDeviceManager service = getService();
+            return service != null && service.isEnable(userId);
+        } catch (Throwable e) {
+            return false;
         }
     }
 
     public void setEnable(int userId, boolean enable) {
         try {
-            getService().setEnable(userId, enable);
-        } catch (RemoteException e) {
-            VirtualRuntime.crash(e);
+            IDeviceManager service = getService();
+            if (service != null) {
+                service.setEnable(userId, enable);
+            }
+        } catch (Throwable ignored) {
         }
     }
 
