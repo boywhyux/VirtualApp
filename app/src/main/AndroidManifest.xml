@@ -81,6 +81,9 @@
         <activity
             android:name="com.carlos.home.AppSettingActivity"
             android:theme="@style/UITheme.HasActionBar" />
+        <activity
+            android:name="com.carlos.home.DeviceConfigActivity"
+            android:theme="@style/UITheme.HasActionBar" />
 
         <activity android:name="com.carlos.home.XposedManager.XposedManagerActivity"
             android:label="Xposed Manager"
