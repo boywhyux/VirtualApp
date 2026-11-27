@@ -23,7 +23,10 @@ public class SettingsData {
         this.packageName = installedAppInfo == null ? null : installedAppInfo.packageName;
         this.userId = userId;
         if (installedAppInfo != null) {
-            loadData(context, installedAppInfo.getApplicationInfo(installedAppInfo.getInstalledUsers()[0]));
+            int[] users = installedAppInfo.getInstalledUsers();
+            if (users != null && users.length > 0) {
+                loadData(context, installedAppInfo.getApplicationInfo(users[0]));
+            }
         }
     }
 
