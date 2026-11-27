@@ -25,7 +25,9 @@ import com.lody.virtual.client.ipc.VDeviceManager;
 import com.lody.virtual.remote.VDeviceConfig;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 /**
  * 自己写的伪造设备页，替代原版打不开的 DeviceDetailActiivty。
@@ -60,6 +62,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
     private EditText mWifiMacEdit;
     private EditText mBtMacEdit;
     private EditText mSerialEdit;
+    private TextView mStatusText;
     private final List<EditText> mPropEdits = new ArrayList<>();
 
     @Override
@@ -118,7 +121,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
         setContentView(scroll);
 
         TextView hint = new TextView(this);
-        hint.setText("开关打开后，这个分身看到的 IMEI、Android ID、MAC 等都是下面填的值；点随机生成会自动打开开关；保存后重启分身生效。每个分身各用各的配置。");
+        hint.setText("开关打开后，这个分身看到的 IMEI、Android ID、MAC 等都是下面填的值；点随机生成会自动打开开关；保存后页面会显示已存入的值，重启分身生效。每个分身各用各的配置。");
         hint.setPadding(0, 0, 0, dp(12));
         root.addView(hint);
 
@@ -136,6 +139,10 @@ public class DeviceConfigActivity extends AppCompatActivity {
         for (int i = 0; i < PROP_KEYS.length; i++) {
             mPropEdits.add(addField(root, PROP_LABELS[i]));
         }
+
+        mStatusText = new TextView(this);
+        mStatusText.setPadding(0, dp(12), 0, 0);
+        root.addView(mStatusText);
 
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -208,15 +215,77 @@ public class DeviceConfigActivity extends AppCompatActivity {
     }
 
     private void onRandom() {
-        VDeviceConfig random = VDeviceConfig.random();
-        random.enable = true;
-        mEnableSwitch.setChecked(true);
-        for (int i = 0; i < PROP_KEYS.length; i++) {
-            random.setProp(PROP_KEYS[i], mConfig.getProp(PROP_KEYS[i]));
+        try {
+            Random rnd = new Random();
+            mConfig.deviceId = randomDigits(rnd, 15, "35");
+            mConfig.androidId = randomHex(rnd, 16);
+            mConfig.iccId = randomDigits(rnd, 20, null);
+            mConfig.wifiMac = randomMac(rnd);
+            mConfig.bluetoothMac = randomMac(rnd);
+            mConfig.serial = randomSerial();
+            mConfig.enable = true;
+            mEnableSwitch.setChecked(true);
+            refreshUi();
+            Toast.makeText(this, "已随机生成，点保存才生效", Toast.LENGTH_SHORT).show();
+        } catch (Throwable e) {
+            Toast.makeText(this, "随机生成失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-        mConfig = random;
-        refreshUi();
-        Toast.makeText(this, "已随机生成，点保存才生效", Toast.LENGTH_SHORT).show();
+    }
+
+    private String randomDigits(Random rnd, int length, String prefix) {
+        StringBuilder sb = new StringBuilder();
+        if (prefix != null) {
+            sb.append(prefix);
+        }
+        while (sb.length() < length) {
+            sb.append(rnd.nextInt(10));
+        }
+        return sb.toString();
+    }
+
+    private String randomHex(Random rnd, int length) {
+        StringBuilder sb = new StringBuilder();
+        while (sb.length() < length) {
+            int v = rnd.nextInt(16);
+            if (v < 10) {
+                sb.append((char) ('0' + v));
+            } else {
+                sb.append((char) ('a' + v - 10));
+            }
+        }
+        return sb.toString();
+    }
+
+    private String randomMac(Random rnd) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            if (i > 0) {
+                sb.append(':');
+            }
+            int v = rnd.nextInt(256);
+            if (v < 16) {
+                sb.append('0');
+            }
+            sb.append(Integer.toHexString(v));
+        }
+        return sb.toString();
+    }
+
+    private String randomSerial() {
+        String base = Build.SERIAL;
+        if (base == null || base.length() == 0 || "unknown".equals(base)) {
+            base = "0123456789ABCDEF";
+        }
+        List<Character> list = new ArrayList<>();
+        for (char c : base.toCharArray()) {
+            list.add(c);
+        }
+        Collections.shuffle(list);
+        StringBuilder sb = new StringBuilder();
+        for (Character c : list) {
+            sb.append(c.charValue());
+        }
+        return sb.toString();
     }
 
     private String textOf(EditText et) {
@@ -250,7 +319,7 @@ public class DeviceConfigActivity extends AppCompatActivity {
             VDeviceManager.get().updateDeviceConfig(mUserId, mConfig);
             VDeviceConfig check = VDeviceManager.get().getDeviceConfig(mUserId);
             if (check == null || check.enable != mConfig.enable
-                        || !TextUtils.equals(check.deviceId, mConfig.deviceId)) {
+                    || !TextUtils.equals(check.deviceId, mConfig.deviceId)) {
                 Toast.makeText(this, "保存失败，请重试", Toast.LENGTH_LONG).show();
                 return;
             }
@@ -260,6 +329,25 @@ public class DeviceConfigActivity extends AppCompatActivity {
         }
         setResult(RESULT_OK);
         Toast.makeText(this, "已保存，重启分身后生效", Toast.LENGTH_SHORT).show();
-        finish();
+        showStatus();
+    }
+
+    private void showStatus() {
+        VDeviceConfig saved = null;
+        try {
+            saved = VDeviceManager.get().getDeviceConfig(mUserId);
+        } catch (Throwable e) {
+            saved = null;
+        }
+        if (saved == null) {
+            mStatusText.setText("读取存入的值失败，请重进页面再看一次。");
+            return;
+        }
+        mStatusText.setText("已存入（分身 " + mUserId + "）：开关=" + (saved.enable ? "开" : "关")
+                + "\nIMEI=" + def(saved.deviceId, "（空）")
+                + "\nAndroid ID=" + def(saved.androidId, "（空）")
+                + "\nWiFi MAC=" + def(saved.wifiMac, "（空）")
+                + "\n蓝牙 MAC=" + def(saved.bluetoothMac, "（空）")
+                + "\n序列号=" + def(saved.serial, "（空）"));
     }
 }
